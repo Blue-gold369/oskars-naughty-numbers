@@ -568,6 +568,18 @@
             50% { transform: scale(1.2); }
             100% { transform: scale(1); }
         }
+
+        /* Level Up Animation */
+        @keyframes levelUpPulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 215, 0, 0); }
+            50% { transform: scale(1.05); box-shadow: 0 0 50px rgba(255, 215, 0, 0.5); }
+            100% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 215, 0, 0); }
+        }
+
+        .level-up-anim {
+            animation: levelUpPulse 1s ease-in-out;
+            border-color: #ffd700 !important;
+        }
         
         /* Confetti Particles */
         .confetti {
@@ -589,6 +601,28 @@
             }
         }
         
+        /* Shake Animation */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .shake {
+            animation: shake 0.5s;
+            animation-iteration-count: 1;
+            border-color: #ff0055 !important;
+            box-shadow: 0 0 30px rgba(255, 0, 85, 0.5) !important;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .container {
@@ -812,6 +846,35 @@
                     { level: 100, title: "GOD OF NUMBERS" }
                 ];
 
+                this.sassyMessages = {
+                    tooHighWayOff: [
+                        "Whoa there, space cowboy! WAY lower.",
+                        "Are you trying to guess the national debt? Go LOWER.",
+                        "Not even close. Drop it like it's hot.",
+                        "I said a number, not a skyscraper. Lower!",
+                        "My grandma guesses better than that. LOWER!"
+                    ],
+                    tooHighClose: [
+                        "A tiny bit lower. Just a smidge.",
+                        "You're burning up! Just drop it a notch.",
+                        "So close! Just a hair lower.",
+                        "Easy does it... just a little lower."
+                    ],
+                    tooLowWayOff: [
+                        "Is that all you got? PUMP IT UP!",
+                        "Pathetic. Go HIGHER.",
+                        "Are you guessing my shoe size? Higher!",
+                        "Way too small. Think BIGGER.",
+                        "Embarrassingly low. Crank it up!"
+                    ],
+                    tooLowClose: [
+                        "Just a little push! Higher.",
+                        "Almost there! Nudge it up.",
+                        "So close I can taste it. Higher!",
+                        "Push it! Just a tiny bit higher."
+                    ]
+                };
+
                 this.gameOptions = {
                     sounds: true,
                     hints: true,
@@ -993,21 +1056,30 @@
                 
                 let hintMessage = '';
                 let arrow = '';
-                
+                let sassArray = [];
+
                 if (guess < this.targetNumber) {
-                    arrow = '⬆️ HIGHER! ';
+                    arrow = '⬆️ ';
+                    if (proximity <= 2) {
+                        sassArray = this.sassyMessages.tooLowWayOff;
+                    } else {
+                        sassArray = this.sassyMessages.tooLowClose;
+                    }
                 } else {
-                    arrow = '⬇️ LOWER! ';
+                    arrow = '⬇️ ';
+                    if (proximity <= 2) {
+                        sassArray = this.sassyMessages.tooHighWayOff;
+                    } else {
+                        sassArray = this.sassyMessages.tooHighClose;
+                    }
                 }
                 
+                const randomSass = sassArray[Math.floor(Math.random() * sassArray.length)];
+
                 if (!this.gameOptions.hardmode && this.gameOptions.hints) {
-                    if (proximity === 1) hintMessage = `${arrow}🧊 Freezing cold! You're way off!`;
-                    else if (proximity === 2) hintMessage = `${arrow}❄️ Cold! Getting warmer but still far...`;
-                    else if (proximity === 3) hintMessage = `${arrow}🔥 Warm! You're getting closer!`;
-                    else if (proximity === 4) hintMessage = `${arrow}🌋 Hot! Very close now!`;
-                    else if (proximity === 5) hintMessage = `${arrow}💥 BURNING! You're so close it hurts!`;
+                    hintMessage = arrow + randomSass;
                 } else {
-                    hintMessage = arrow.slice(0, -1); // Just the direction arrow
+                    hintMessage = arrow + (guess < this.targetNumber ? "HIGHER" : "LOWER");
                 }
                 
                 this.typewriterEffect(hintMessage);
@@ -1018,6 +1090,12 @@
                     const frequencies = [300, 400, 600, 900, 1200];
                     playSound(frequencies[proximity - 1], 0.2);
                 }
+
+                // Shake effect on wrong guess
+                const card = document.querySelector('.generator-card');
+                card.classList.remove('shake');
+                void card.offsetWidth; // Trigger reflow
+                card.classList.add('shake');
             }
             
             calculateProximity(difference) {
@@ -1173,9 +1251,18 @@
                 this.updateProgressionDisplay();
 
                 if (leveledUp) {
-                    this.typewriterEffect(`LEVEL UP! You are now level ${this.level}: ${this.getTitle()}!`);
+                    // Queue the level up message so it doesn't get immediately overwritten by the win message
+                    setTimeout(() => {
+                         this.typewriterEffect(`LEVEL UP! You are now level ${this.level}: ${this.getTitle()}!`);
+                    }, 4000); // Wait for win message to be read
+
                     if (this.gameOptions.sounds) playSound(800, 0.4, 'square');
                     this.createRainbowConfetti();
+
+                    // Add Level Up Visual
+                    const card = document.querySelector('.generator-card');
+                    card.classList.add('level-up-anim');
+                    setTimeout(() => card.classList.remove('level-up-anim'), 1500);
                 }
             }
 
