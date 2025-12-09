@@ -122,6 +122,63 @@
             100% { filter: hue-rotate(360deg); }
         }
         
+        /* Progression System */
+        .progression-container {
+            margin-bottom: 25px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #00d4ff;
+            border-radius: 15px;
+        }
+
+        .level-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .level-badge {
+            font-size: 1.2rem;
+            font-weight: 900;
+            color: #ff1493;
+            text-shadow: 0 0 10px rgba(255, 20, 147, 0.5);
+        }
+
+        .player-title {
+            font-size: 1rem;
+            color: #00ff88;
+            font-style: italic;
+        }
+
+        .xp-bar-container {
+            width: 100%;
+            height: 15px;
+            background: #333;
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .xp-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .xp-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.7rem;
+            color: #fff;
+            font-weight: bold;
+            text-shadow: 0 0 2px #000;
+            z-index: 2;
+        }
+
         /* Options Section */
         .options-section {
             margin-bottom: 30px;
@@ -565,6 +622,17 @@
         <h1 class="title">OSKAR'S NAUGHTY NUMBERS</h1>
         
         <div class="generator-card">
+            <div class="progression-container">
+                <div class="level-info">
+                    <span class="level-badge">LVL <span id="player-level">1</span></span>
+                    <span class="player-title" id="player-title">Novice Nuisance</span>
+                </div>
+                <div class="xp-bar-container">
+                    <div class="xp-bar-fill" id="xp-bar-fill" style="width: 0%"></div>
+                    <div class="xp-text"><span id="current-xp">0</span> / <span id="next-level-xp">100</span> XP</div>
+                </div>
+            </div>
+
             <div class="options-section">
                 <div class="option-group">
                     <label class="option-label">Difficulty Level</label>
@@ -730,6 +798,20 @@
                 this.gameActive = false;
                 this.bestScores = this.loadBestScores();
                 
+                // Progression Data
+                const savedProgress = this.loadProgress();
+                this.level = savedProgress.level || 1;
+                this.xp = savedProgress.xp || 0;
+                this.titles = [
+                    { level: 1, title: "Novice Nuisance" },
+                    { level: 2, title: "Lucky Guesser" },
+                    { level: 5, title: "Number Cruncher" },
+                    { level: 10, title: "Probability Wizard" },
+                    { level: 20, title: "Oracle of Oskar" },
+                    { level: 50, title: "The Chosen One" },
+                    { level: 100, title: "GOD OF NUMBERS" }
+                ];
+
                 this.gameOptions = {
                     sounds: true,
                     hints: true,
@@ -740,6 +822,7 @@
                 this.initElements();
                 this.bindEvents();
                 this.updateDisplay();
+                this.updateProgressionDisplay();
             }
             
             initElements() {
@@ -756,6 +839,13 @@
                 this.bestScore = document.getElementById('best-score');
                 this.currentRange = document.getElementById('current-range');
                 this.toggles = document.querySelectorAll('.toggle-switch');
+
+                // Progression Elements
+                this.playerLevel = document.getElementById('player-level');
+                this.playerTitle = document.getElementById('player-title');
+                this.currentXp = document.getElementById('current-xp');
+                this.nextLevelXp = document.getElementById('next-level-xp');
+                this.xpBarFill = document.getElementById('xp-bar-fill');
             }
             
             bindEvents() {
@@ -874,16 +964,20 @@
                 }
                 
                 let winMessage = '';
+                // Calculate XP: Base is maxRange/2, bonus is maxRange/attempts
+                const earnedXp = (this.maxRange / 2) + (this.maxRange / this.attempts);
+                this.addXp(earnedXp);
+
                 if (this.attempts === 1) {
-                    winMessage = `🌟 INCREDIBLE! You got it in 1 try! That's legendary, Oskar! 🌟`;
+                    winMessage = `🌟 INCREDIBLE! You got it in 1 try! +${Math.round(earnedXp)} XP! 🌟`;
                     this.createRainbowConfetti();
                     if (this.gameOptions.sounds) playSound(1500, 0.5);
                 } else if (this.attempts <= 3) {
-                    winMessage = `🔥 AMAZING! You guessed ${this.targetNumber} in just ${this.attempts} tries! Well done, Oskar! 🔥`;
+                    winMessage = `🔥 AMAZING! Found in ${this.attempts} tries! +${Math.round(earnedXp)} XP! 🔥`;
                     this.createConfetti();
                     if (this.gameOptions.sounds) playSound(1200, 0.4);
                 } else {
-                    winMessage = `🎉 Congratulations! You found the number ${this.targetNumber} in ${this.attempts} attempts! Great job, Oskar! 🎉`;
+                    winMessage = `🎉 Correct! The number was ${this.targetNumber}. +${Math.round(earnedXp)} XP! 🎉`;
                     this.createConfetti();
                     if (this.gameOptions.sounds) playSound(1000, 0.3);
                 }
@@ -1035,6 +1129,67 @@
             
             saveBestScores() {
                 localStorage.setItem('oskarNaughtyNumbersScores', JSON.stringify(this.bestScores));
+            }
+
+            loadProgress() {
+                const saved = localStorage.getItem('oskarNaughtyNumbersProgress');
+                return saved ? JSON.parse(saved) : { level: 1, xp: 0 };
+            }
+
+            saveProgress() {
+                localStorage.setItem('oskarNaughtyNumbersProgress', JSON.stringify({
+                    level: this.level,
+                    xp: this.xp
+                }));
+            }
+
+            getNbXpForNextLevel() {
+                return this.level * 100;
+            }
+
+            getTitle() {
+                let currentTitle = "Novice Nuisance";
+                for (const t of this.titles) {
+                    if (this.level >= t.level) {
+                        currentTitle = t.title;
+                    }
+                }
+                return currentTitle;
+            }
+
+            addXp(amount) {
+                this.xp += Math.round(amount);
+                let needed = this.getNbXpForNextLevel();
+
+                let leveledUp = false;
+                while (this.xp >= needed) {
+                    this.xp -= needed;
+                    this.level++;
+                    needed = this.getNbXpForNextLevel();
+                    leveledUp = true;
+                }
+
+                this.saveProgress();
+                this.updateProgressionDisplay();
+
+                if (leveledUp) {
+                    this.typewriterEffect(`LEVEL UP! You are now level ${this.level}: ${this.getTitle()}!`);
+                    if (this.gameOptions.sounds) playSound(800, 0.4, 'square');
+                    this.createRainbowConfetti();
+                }
+            }
+
+            updateProgressionDisplay() {
+                if (!this.playerLevel) return; // Guard clause
+
+                this.playerLevel.textContent = this.level;
+                this.playerTitle.textContent = this.getTitle();
+                this.currentXp.textContent = this.xp;
+                const needed = this.getNbXpForNextLevel();
+                this.nextLevelXp.textContent = needed;
+
+                const percentage = (this.xp / needed) * 100;
+                this.xpBarFill.style.width = `${percentage}%`;
             }
         }
         
